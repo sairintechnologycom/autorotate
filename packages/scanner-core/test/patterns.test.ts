@@ -60,9 +60,10 @@ describe("Pattern Matching", () => {
   it("masks sensitive values correctly", () => {
     const v = mockVar(
       "OPENAI_KEY",
-      secret("sk", "-", "proj", "-", "0".repeat(24))
+      secret("sk", "-", "proj", "-", "0".repeat(32))
     );
     const risk = classifyVar(v);
+    expect(risk.matches[0].patternId).toBe("openai-project");
     expect(risk.matches[0].excerpt).toBe("sk-p…0000");
   });
 

@@ -150,12 +150,20 @@ export const PATTERNS: Pattern[] = [
 
   // AI providers
   {
-    id: "openai-key",
-    name: "OpenAI API Key",
+    id: "openai-project",
+    name: "OpenAI Project API Key",
+    provider: "OpenAI",
+    severity: "critical",
+    runbookId: "openai",
+    valueRegex: /\bsk-proj-[A-Za-z0-9_-]{32,}\b/,
+  },
+  {
+    id: "openai-classic",
+    name: "OpenAI Classic API Key",
     provider: "OpenAI",
     severity: "high",
     runbookId: "openai",
-    valueRegex: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/,
+    valueRegex: /\bsk-[A-Za-z0-9]{48}\b/,
   },
   {
     id: "anthropic-key",

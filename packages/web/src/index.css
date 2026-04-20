@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --font-sans: "Satoshi", "Inter", system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -392,14 +394,11 @@ textarea {
 
 .finding-main h4 {
   margin: 0 0 8px;
-  font-size: 1.2rem;
   letter-spacing: -0.02em;
-  color: #f4f8ff;
 }
 
 .finding-main p {
   margin: 0;
-  color: var(--muted);
 }
 
 .provider-pill {

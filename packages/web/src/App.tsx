@@ -36,8 +36,12 @@ export default function App() {
   const [report, setReport] = useState<RiskReport | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>(
     () => {
-      const saved = localStorage.getItem("envscan_completed_steps");
-      return saved ? JSON.parse(saved) : {};
+      try {
+        const saved = localStorage.getItem("envscan_completed_steps");
+        return saved ? JSON.parse(saved) : {};
+      } catch {
+        return {};
+      }
     },
   );
   const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null);
@@ -258,30 +262,34 @@ export default function App() {
               {/* Summary Dashboard */}
               <div className="stats-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="stat-card stat-card-neutral glass p-5 rounded-xl">
-                  <p className="text-xs font-bold text-zinc-500 uppercase mb-1">
+                  <p className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider mb-2">
                     Total Variables
                   </p>
-                  <p className="text-2xl font-mono">{report.stats.totalVars}</p>
+                  <p className="text-3xl font-mono text-white">
+                    {report.stats.totalVars}
+                  </p>
                 </div>
                 <div className="stat-card stat-card-critical glass p-5 rounded-xl border-l-4 border-l-red-500">
-                  <p className="text-xs font-bold text-red-500 uppercase mb-1">
+                  <p className="text-[11px] font-bold text-red-300 uppercase tracking-wider mb-2">
                     Critical Risks
                   </p>
-                  <p className="text-2xl font-mono">
+                  <p className="text-3xl font-mono text-white">
                     {report.stats.criticalCount}
                   </p>
                 </div>
                 <div className="stat-card stat-card-high glass p-5 rounded-xl border-l-4 border-l-orange-500">
-                  <p className="text-xs font-bold text-orange-500 uppercase mb-1">
+                  <p className="text-[11px] font-bold text-orange-300 uppercase tracking-wider mb-2">
                     High Risks
                   </p>
-                  <p className="text-2xl font-mono">{report.stats.highCount}</p>
+                  <p className="text-3xl font-mono text-white">
+                    {report.stats.highCount}
+                  </p>
                 </div>
                 <div className="stat-card stat-card-projects glass p-5 rounded-xl">
-                  <p className="text-xs font-bold text-blue-500 uppercase mb-1">
+                  <p className="text-[11px] font-bold text-blue-300 uppercase tracking-wider mb-2">
                     Projects Scanned
                   </p>
-                  <p className="text-2xl font-mono">
+                  <p className="text-3xl font-mono text-white">
                     {report.stats.totalProjects}
                   </p>
                 </div>
@@ -332,10 +340,12 @@ export default function App() {
                     )}
                   />
                   <div>
-                    <p className="text-sm font-semibold">GitHub Integration</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm font-semibold text-white">
+                      GitHub Integration
+                    </p>
+                    <p className="text-xs text-zinc-300">
                       {report.integrations.github
-                        ? "Connected - Rotate Tokens"
+                        ? "Connected — Rotate Tokens"
                         : "Not Detected"}
                     </p>
                   </div>
@@ -429,21 +439,21 @@ export default function App() {
                                 >
                                   {item.severity}
                                 </span>
-                                <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono tracking-tight">
+                                <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-mono tracking-tight">
                                   {item.variable.teamName && (
                                     <>
-                                      <Users className="w-3 h-3" />
+                                      <Users className="w-3.5 h-3.5" />
                                       <span>{item.variable.teamName}</span>
-                                      <span>/</span>
+                                      <span className="text-zinc-500">/</span>
                                     </>
                                   )}
                                   <span>{item.variable.projectName}</span>
                                 </div>
                               </div>
-                              <h4 className="font-mono text-zinc-100">
+                              <h4 className="font-mono text-lg font-semibold text-white break-all">
                                 {item.variable.key}
                               </h4>
-                              <p className="text-sm text-zinc-400 max-w-2xl">
+                              <p className="text-sm text-zinc-200 max-w-2xl leading-relaxed">
                                 {item.rationale}
                               </p>
                             </div>
@@ -456,7 +466,7 @@ export default function App() {
                                   <ChevronDown className="w-4 h-4 text-zinc-500" />
                                 )}
                               </div>
-                              <span className="provider-pill text-[10px] text-zinc-600 uppercase tracking-widest font-bold">
+                              <span className="provider-pill text-[11px] text-zinc-200 uppercase tracking-widest font-bold">
                                 {item.matches[0]?.provider || "Generic"}
                               </span>
                             </div>
@@ -473,13 +483,13 @@ export default function App() {
                                 <div className="p-5 pt-0 space-y-6">
                                   <div className="flex items-center justify-between gap-4">
                                     {item.matches[0]?.excerpt && (
-                                      <div className="match-box flex-1 p-3 bg-black/40 rounded-lg border border-white/5 font-mono text-[11px] text-zinc-400 flex items-center gap-3 overflow-hidden">
-                                        <Terminal className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+                                      <div className="match-box flex-1 p-3 bg-black/40 rounded-lg border border-white/5 font-mono text-xs text-zinc-200 flex items-center gap-3 overflow-hidden">
+                                        <Terminal className="w-4 h-4 text-zinc-400 flex-shrink-0" />
                                         <div className="flex gap-2 overflow-hidden">
-                                          <span className="opacity-50 flex-shrink-0">
+                                          <span className="text-zinc-400 flex-shrink-0">
                                             Match:
                                           </span>
-                                          <span className="text-zinc-300 truncate">
+                                          <span className="text-zinc-100 truncate">
                                             {item.matches[0].excerpt}
                                           </span>
                                         </div>
@@ -514,7 +524,7 @@ export default function App() {
                                   {item.runbook && (
                                     <div className="space-y-4">
                                       <div className="flex items-center justify-between">
-                                        <h5 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                                        <h5 className="text-xs font-bold text-zinc-200 uppercase tracking-widest">
                                           Rotation Checklist
                                         </h5>
                                         <div className="flex gap-2">
@@ -593,10 +603,10 @@ export default function App() {
                                                 </div>
                                                 <p
                                                   className={cn(
-                                                    "text-xs leading-relaxed transition-colors",
+                                                    "text-sm leading-relaxed transition-colors",
                                                     isDone
-                                                      ? "text-green-200/50 line-through"
-                                                      : "text-zinc-300",
+                                                      ? "text-green-200/60 line-through"
+                                                      : "text-zinc-100",
                                                   )}
                                                 >
                                                   {step}
@@ -607,9 +617,9 @@ export default function App() {
                                         )}
                                       </div>
                                       {item.runbook.postRotationNote && (
-                                        <div className="note-card p-3 bg-amber-500/5 rounded-lg border border-amber-500/10 flex items-start gap-3">
-                                          <AlertTriangle className="w-4 h-4 text-amber-500/50 mt-0.5" />
-                                          <p className="text-[11px] text-amber-500/80 italic">
+                                        <div className="note-card p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 flex items-start gap-3">
+                                          <AlertTriangle className="w-4 h-4 text-amber-300 mt-0.5 flex-shrink-0" />
+                                          <p className="text-xs text-amber-100 leading-relaxed">
                                             {item.runbook.postRotationNote}
                                           </p>
                                         </div>
