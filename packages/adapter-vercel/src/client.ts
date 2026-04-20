@@ -7,6 +7,8 @@ export class VercelApiError extends Error {
 export class VercelClient {
   constructor(private token: string, private teamId?: string) {}
 
+  setTeamId(id?: string) { this.teamId = id; }
+
   async get<T>(path: string, query: Record<string, string | undefined> = {}): Promise<T> {
     const qs = new URLSearchParams();
     if (this.teamId) qs.set('teamId', this.teamId);

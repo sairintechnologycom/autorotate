@@ -9,6 +9,8 @@ export interface VarRecord {
   targets: string[];                 // ['production','preview',...]
   projectId: string;
   projectName: string;
+  teamId?: string;
+  teamName?: string;
   createdAt?: number;
   updatedAt?: number;
   comment?: string;

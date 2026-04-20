@@ -14,10 +14,33 @@ interface VercelEnvVar {
 }
 interface VercelEnvResponse { envs: VercelEnvVar[]; }
 
+interface VercelTeam { id: string; name: string; slug: string; }
+interface VercelTeamsResponse { teams: VercelTeam[]; pagination?: { next: number | null }; }
+
 export interface EnumerateOptions {
   token: string;
   teamId?: string;
   onProgress?: (msg: string, pct: number) => void;
+}
+
+export async function scanSingleVar(opts: { token: string, teamId?: string, projectId: string, envId: string }): Promise<VarRecord> {
+  const client = new VercelClient(opts.token, opts.teamId);
+  const res = await client.get<VercelEnvResponse>(`/v10/projects/${opts.projectId}/env/${opts.envId}`, { decrypt: 'true' });
+  // Vercel returns a single object for this endpoint usually, but let's be safe
+  const e = (res as any) as VercelEnvVar; 
+  
+  // Need project name too, but we might not have it easily here without another call
+  // For verification, we mainly care about the value/type
+  return {
+    id: e.id, key: e.key,
+    value: e.type === 'sensitive' ? null : (e.value ?? null),
+    providerType: e.type,
+    readableByAttacker: e.type !== 'sensitive',
+    targets: e.target ?? [],
+    projectId: opts.projectId, projectName: 'Unknown',
+    teamId: opts.teamId,
+    createdAt: e.createdAt, updatedAt: e.updatedAt, comment: e.comment,
+  };
 }
 
 export async function enumerateVercel(opts: EnumerateOptions): Promise<{
@@ -25,42 +48,92 @@ export async function enumerateVercel(opts: EnumerateOptions): Promise<{
   integrations: { github: boolean; linear: boolean; other: string[] };
 }> {
   const client = new VercelClient(opts.token, opts.teamId);
-
-  // 1) list projects (paginated)
-  const projects: VercelProject[] = [];
-  let cursor: string | undefined;
-  do {
-    const res = await client.get<VercelProjectsResponse>('/v9/projects', {
-      limit: '100', until: cursor,
-    });
-    projects.push(...res.projects);
-    cursor = res.pagination?.next ? String(res.pagination.next) : undefined;
-  } while (cursor);
-
-  opts.onProgress?.(`Found ${projects.length} projects`, 10);
-
-  // 2) list env vars per project
   const records: VarRecord[] = [];
-  let done = 0;
+  const integrations = { github: false, linear: false, other: [] as string[] };
 
-  for (const p of projects) {
-    const res = await client.get<VercelEnvResponse>(`/v10/projects/${p.id}/env`, { decrypt: 'true' });
-    for (const e of res.envs) {
-      records.push({
-        id: e.id, key: e.key,
-        value: e.type === 'sensitive' ? null : (e.value ?? null),
-        providerType: e.type,
-        readableByAttacker: e.type !== 'sensitive',
-        targets: e.target ?? [],
-        projectId: p.id, projectName: p.name,
-        createdAt: e.createdAt, updatedAt: e.updatedAt, comment: e.comment,
-      });
+  const contexts: Array<{ id?: string; name: string }> = [];
+  
+  if (opts.teamId) {
+    contexts.push({ id: opts.teamId, name: 'Specified Team' });
+  } else {
+    opts.onProgress?.('Fetching accessible teams...', 5);
+    try {
+      // 1) List teams
+      let cursor: string | undefined;
+      do {
+        const res = await client.get<VercelTeamsResponse>('/v2/teams', { until: cursor });
+        contexts.push(...res.teams.map(t => ({ id: t.id, name: t.name || t.slug })));
+        cursor = res.pagination?.next ? String(res.pagination.next) : undefined;
+      } while (cursor);
+      
+      // 2) Add personal account (no teamId)
+      contexts.unshift({ id: undefined, name: 'Personal Account' });
+    } catch (err) {
+      // If team fetch fails, fallback to just personal account
+      contexts.push({ id: undefined, name: 'Personal Account' });
     }
-    done++;
-    opts.onProgress?.(`Scanned ${p.name}`, 10 + Math.round((done / projects.length) * 85));
   }
 
-  const integrations = await detectIntegrations(client);
+  let currentContextIdx = 0;
+  for (const context of contexts) {
+    const contextPctBase = (currentContextIdx / contexts.length) * 100;
+    const contextPctWeight = 1 / contexts.length;
+    
+    client.setTeamId(context.id);
+    opts.onProgress?.(`Scanning ${context.name}...`, Math.round(contextPctBase + 2));
+
+    // 1) list projects
+    const projects: VercelProject[] = [];
+    let cursor: string | undefined;
+    try {
+      do {
+        const res = await client.get<VercelProjectsResponse>('/v9/projects', {
+          limit: '100', until: cursor,
+        });
+        projects.push(...res.projects);
+        cursor = res.pagination?.next ? String(res.pagination.next) : undefined;
+      } while (cursor);
+    } catch (err) {
+      console.error(`Failed to list projects for ${context.name}`, err);
+      continue;
+    }
+
+    // 2) list env vars per project
+    let done = 0;
+    for (const p of projects) {
+      try {
+        const res = await client.get<VercelEnvResponse>(`/v10/projects/${p.id}/env`, { decrypt: 'true' });
+        for (const e of res.envs) {
+          records.push({
+            id: e.id, key: e.key,
+            value: e.type === 'sensitive' ? null : (e.value ?? null),
+            providerType: e.type,
+            readableByAttacker: e.type !== 'sensitive',
+            targets: e.target ?? [],
+            projectId: p.id, projectName: p.name,
+            teamId: context.id, teamName: context.name,
+            createdAt: e.createdAt, updatedAt: e.updatedAt, comment: e.comment,
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to scan project ${p.name} in ${context.name}`);
+      }
+      done++;
+      opts.onProgress?.(
+        `Scanned ${context.name} / ${p.name}`, 
+        Math.round(contextPctBase + (done / projects.length) * 80 * contextPctWeight)
+      );
+    }
+
+    // 3) detect integrations for this context
+    const contextIntegrations = await detectIntegrations(client);
+    integrations.github = integrations.github || contextIntegrations.github;
+    integrations.linear = integrations.linear || contextIntegrations.linear;
+    integrations.other = Array.from(new Set([...integrations.other, ...contextIntegrations.other]));
+    
+    currentContextIdx++;
+  }
+
   opts.onProgress?.('Done', 100);
   return { records, integrations };
 }

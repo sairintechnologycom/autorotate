@@ -4,6 +4,7 @@ export interface RunbookEntry {
   steps: string[];              // each ≤140 chars
   consoleUrl: string;
   postRotationNote: string;
+  copyCommand?: string;
 }
 
 export const RUNBOOK: Record<string, RunbookEntry> = {
@@ -137,7 +138,7 @@ export const RUNBOOK: Record<string, RunbookEntry> = {
       'Redeploy. Cached client tokens will need to re-auth.',
       'Audit Dashboard → Logs → API logs for the window.',
     ],
-    consoleUrl: 'https://app.supabase.com',
+    consoleUrl: 'https://supabase.com/dashboard/project/_/settings/api',
     postRotationNote: 'Active sessions are logged out when the JWT secret rotates.',
   },
   clerk: {
@@ -161,6 +162,7 @@ export const RUNBOOK: Record<string, RunbookEntry> = {
     ],
     consoleUrl: '',
     postRotationNote: 'Time this for off-peak — everyone is logged out.',
+    copyCommand: 'openssl rand -base64 32',
   },
   jwt: {
     id: 'jwt',
@@ -172,6 +174,7 @@ export const RUNBOOK: Record<string, RunbookEntry> = {
     ],
     consoleUrl: '',
     postRotationNote: 'Dual-verify avoids a mass logout.',
+    copyCommand: 'openssl rand -base64 64',
   },
   slack: {
     id: 'slack',

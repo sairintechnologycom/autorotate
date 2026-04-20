@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Shield, AlertTriangle, ExternalLink, ArrowRight, RefreshCw,
-  Lock, ChevronDown, ChevronUp, Terminal
+  Lock, ChevronDown, ChevronUp, Terminal, Copy, Check, Eye, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { enumerateVercel } from '@envscan/adapter-vercel';
+import { enumerateVercel, scanSingleVar } from '@envscan/adapter-vercel';
 import { classifyVar } from '@envscan/scanner-core';
-import type { RiskReport } from '@envscan/scanner-core';
+import type { RiskReport, RiskItem } from '@envscan/scanner-core';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -20,8 +20,47 @@ export default function App() {
   const [status, setStatus] = useState<'idle' | 'scanning' | 'done' | 'error'>('idle');
   const [progress, setProgress] = useState({ msg: '', pct: 0 });
   const [report, setReport] = useState<RiskReport | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('envscan_completed_steps');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [verifyingIdx, setVerifyingIdx] = useState<number | null>(null);
+  const [verifiedItems, setVerifiedItems] = useState<Record<number, 'clean' | 'still_risky'>>({});
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const toggleStep = (itemId: string, stepIdx: number) => {
+    const key = `${itemId}-${stepIdx}`;
+    const next = { ...completedSteps, [key]: !completedSteps[key] };
+    setCompletedSteps(next);
+    localStorage.setItem('envscan_completed_steps', JSON.stringify(next));
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCmd(text);
+    setTimeout(() => setCopiedCmd(null), 2000);
+  };
+
+  const verifyFix = async (item: RiskItem, idx: number) => {
+    setVerifyingIdx(idx);
+    try {
+      const fresh = await scanSingleVar({
+        token,
+        teamId: item.variable.teamId,
+        projectId: item.variable.projectId,
+        envId: item.variable.id
+      });
+      const risk = classifyVar(fresh);
+      const isClean = risk.severity === 'info' || risk.severity === 'low';
+      setVerifiedItems(prev => ({ ...prev, [idx]: isClean ? 'clean' : 'still_risky' }));
+    } catch (err) {
+      console.error('Verification failed', err);
+    } finally {
+      setVerifyingIdx(null);
+    }
+  };
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +169,7 @@ export default function App() {
                       placeholder="team_xxxxxxxxxxxx..."
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm"
                     />
+                    <p className="text-[10px] text-zinc-500">Leave blank to scan all accessible teams.</p>
                   </div>
 
                   <button className="btn-primary w-full py-4 flex items-center justify-center gap-2 group">
@@ -211,6 +251,22 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Risk Analysis</h3>
                   <div className="flex gap-2">
+                    {report.items.some(i => i.runbook?.consoleUrl && (i.severity === 'critical' || i.severity === 'high')) && (
+                      <button 
+                        onClick={() => {
+                          const urls = report.items
+                            .filter(i => i.runbook?.consoleUrl && (i.severity === 'critical' || i.severity === 'high'))
+                            .map(i => i.runbook!.consoleUrl);
+                          const uniqueUrls = Array.from(new Set(urls));
+                          if (confirm(`This will open ${uniqueUrls.length} rotation pages in new tabs. Allow popups if prompted.`)) {
+                            uniqueUrls.forEach(url => window.open(url, '_blank'));
+                          }
+                        }}
+                        className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20"
+                      >
+                        Open All Rotation Pages
+                      </button>
+                    )}
                     <button onClick={() => setStatus('idle')} className="text-xs font-medium text-zinc-500 hover:text-white transition-colors bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
                       New Scan
                     </button>
@@ -245,7 +301,16 @@ export default function App() {
                               )}>
                                 {item.severity}
                               </span>
-                              <span className="text-[10px] text-zinc-500 font-mono tracking-tight">{item.variable.projectName}</span>
+                              <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono tracking-tight">
+                                {item.variable.teamName && (
+                                  <>
+                                    <Users className="w-3 h-3" />
+                                    <span>{item.variable.teamName}</span>
+                                    <span>/</span>
+                                  </>
+                                )}
+                                <span>{item.variable.projectName}</span>
+                              </div>
                             </div>
                             <h4 className="font-mono text-zinc-100">{item.variable.key}</h4>
                             <p className="text-sm text-zinc-400 max-w-2xl">{item.rationale}</p>
@@ -270,42 +335,84 @@ export default function App() {
                               className="border-t border-white/5 bg-black/20"
                             >
                               <div className="p-5 pt-0 space-y-6">
-                                {item.matches[0]?.excerpt && (
-                                   <div className="p-3 bg-black/40 rounded-lg border border-white/5 font-mono text-[11px] text-zinc-400 flex items-center gap-3">
-                                     <Terminal className="w-3.5 h-3.5 text-zinc-600" />
-                                     <div className="flex gap-2">
-                                       <span className="opacity-50">Match:</span>
-                                       <span className="text-zinc-300">{item.matches[0].excerpt}</span>
+                                <div className="flex items-center justify-between gap-4">
+                                  {item.matches[0]?.excerpt && (
+                                     <div className="flex-1 p-3 bg-black/40 rounded-lg border border-white/5 font-mono text-[11px] text-zinc-400 flex items-center gap-3 overflow-hidden">
+                                       <Terminal className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+                                       <div className="flex gap-2 overflow-hidden">
+                                         <span className="opacity-50 flex-shrink-0">Match:</span>
+                                         <span className="text-zinc-300 truncate">{item.matches[0].excerpt}</span>
+                                       </div>
                                      </div>
-                                   </div>
-                                )}
+                                  )}
+                                  <button 
+                                    onClick={() => verifyFix(item, idx)}
+                                    disabled={verifyingIdx === idx}
+                                    className={cn(
+                                      "flex-shrink-0 text-[10px] px-3 py-2.5 rounded-lg border transition-all flex items-center gap-2 font-bold uppercase tracking-wider",
+                                      verifiedItems[idx] === 'clean' ? "bg-green-500/20 border-green-500/50 text-green-400" :
+                                      verifiedItems[idx] === 'still_risky' ? "bg-red-500/20 border-red-500/50 text-red-400" :
+                                      "bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300 disabled:opacity-50"
+                                    )}
+                                  >
+                                    {verifyingIdx === idx ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                                    {verifiedItems[idx] === 'clean' ? "Verified Clean" : 
+                                     verifiedItems[idx] === 'still_risky' ? "Still Exposed" : "Verify Rotation"}
+                                  </button>
+                                </div>
 
                                 {item.runbook && (
                                   <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                       <h5 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Rotation Checklist</h5>
-                                      {item.runbook.consoleUrl && (
-                                        <a 
-                                          href={item.runbook.consoleUrl} 
-                                          target="_blank" 
-                                          rel="noreferrer"
-                                          className="text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 transition-all flex items-center gap-1.5"
-                                        >
-                                          Open Console <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      )}
+                                      <div className="flex gap-2">
+                                        {item.runbook.copyCommand && (
+                                          <button 
+                                            onClick={() => copyToClipboard(item.runbook!.copyCommand!)}
+                                            className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1 rounded-full border border-zinc-700 transition-all flex items-center gap-1.5"
+                                          >
+                                            {copiedCmd === item.runbook.copyCommand ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                            {copiedCmd === item.runbook.copyCommand ? "Copied!" : "Copy Command"}
+                                          </button>
+                                        )}
+                                        {item.runbook.consoleUrl && (
+                                          <a 
+                                            href={item.runbook.consoleUrl} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            className="text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 transition-all flex items-center gap-1.5"
+                                          >
+                                            Open Console <ExternalLink className="w-3 h-3" />
+                                          </a>
+                                        )}
+                                      </div>
                                     </div>
                                     <div className="grid gap-2">
-                                      {item.runbook.steps.map((step, sIdx) => (
-                                        <div key={sIdx} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg border border-white/5">
-                                          <div className="mt-0.5">
-                                            <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-500">
-                                              {sIdx + 1}
+                                      {item.runbook.steps.map((step, sIdx) => {
+                                        const isDone = completedSteps[`${item.variable.id}-${sIdx}`];
+                                        return (
+                                          <button 
+                                            key={sIdx} 
+                                            onClick={() => toggleStep(item.variable.id, sIdx)}
+                                            className={cn(
+                                              "flex items-start gap-3 p-3 rounded-lg border transition-all text-left group/step",
+                                              isDone ? "bg-green-500/10 border-green-500/20 opacity-60" : "bg-white/5 border-white/5 hover:border-white/10"
+                                            )}
+                                          >
+                                            <div className="mt-0.5">
+                                              <div className={cn(
+                                                "w-4 h-4 rounded-md border flex items-center justify-center text-[9px] font-bold transition-colors",
+                                                isDone ? "bg-green-500 border-green-500 text-white" : "border-zinc-700 text-zinc-500 group-hover/step:border-zinc-500"
+                                              )}>
+                                                {isDone ? "✓" : sIdx + 1}
+                                              </div>
                                             </div>
-                                          </div>
-                                          <p className="text-xs text-zinc-300 leading-relaxed">{step}</p>
-                                        </div>
-                                      ))}
+                                            <p className={cn("text-xs leading-relaxed transition-colors", isDone ? "text-green-200/50 line-through" : "text-zinc-300")}>
+                                              {step}
+                                            </p>
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                     {item.runbook.postRotationNote && (
                                       <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/10 flex items-start gap-3">
