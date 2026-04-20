@@ -1,72 +1,57 @@
 #!/usr/bin/env node
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import prompts from 'prompts';
-import kleur from 'kleur';
-import { enumerateVercel } from '@envscan/adapter-vercel';
-import { classifyVar } from '@envscan/scanner-core';
-import type { VarRecord, RiskItem, RiskReport } from '@envscan/scanner-core';
-import fs from 'node:fs/promises';
+import fs from "node:fs/promises";
+import { enumerateVercel } from "@envscan/adapter-vercel";
+import { buildRiskReport } from "@envscan/scanner-core";
+import type { RiskItem, RiskReport } from "@envscan/scanner-core";
+import kleur from "kleur";
+import prompts from "prompts";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
-    .option('token', { type: 'string', description: 'Vercel access token' })
-    .option('team', { type: 'string', description: 'Vercel Team ID' })
-    .option('json', { type: 'boolean', description: 'Output as JSON' })
-    .option('out', { type: 'string', description: 'Output file path' })
-    .help()
-    .argv;
+    .option("token", { type: "string", description: "Vercel access token" })
+    .option("team", { type: "string", description: "Vercel Team ID" })
+    .option("json", { type: "boolean", description: "Output as JSON" })
+    .option("out", { type: "string", description: "Output file path" })
+    .help().argv;
 
   let token = (argv.token as string) || process.env.VERCEL_TOKEN;
 
   if (!token) {
     const response = await prompts({
-      type: 'password',
-      name: 'token',
-      message: 'Enter your Vercel access token (read-only recommended):'
+      type: "password",
+      name: "token",
+      message: "Enter your Vercel access token (read-only recommended):",
     });
     token = response.token;
   }
 
   if (!token) {
-    console.error(kleur.red('Error: Vercel access token is required.'));
+    console.error(kleur.red("Error: Vercel access token is required."));
     process.exit(1);
   }
 
-  console.log(kleur.cyan('\nStarting EnvScan...'));
+  console.log(kleur.cyan("\nStarting EnvScan..."));
 
   try {
-    const { records, integrations } = await enumerateVercel({
+    const { records, integrations, failures } = await enumerateVercel({
       token,
       teamId: argv.team as string,
       onProgress: (msg: string, pct: number) => {
-        process.stderr.write(`\r${kleur.yellow(`[${pct}%]`)} ${msg}${' '.repeat(20)}`);
-      }
+        process.stderr.write(
+          `\r${kleur.yellow(`[${pct}%]`)} ${msg}${" ".repeat(20)}`,
+        );
+      },
     });
 
-    process.stderr.write('\n');
+    process.stderr.write("\n");
 
-    const items: RiskItem[] = records.map(classifyVar);
-    
-    // Stats
-    const stats = {
-      totalProjects: new Set(records.map((r: VarRecord) => r.projectId)).size,
-      totalVars: records.length,
-      varsReadableByAttacker: records.filter((r: VarRecord) => r.readableByAttacker).length,
-      criticalCount: items.filter((i: RiskItem) => i.severity === 'critical').length,
-      highCount: items.filter((i: RiskItem) => i.severity === 'high').length,
-      mediumCount: items.filter((i: RiskItem) => i.severity === 'medium').length,
-    };
-
-    const report: RiskReport = {
-      scannedAt: new Date().toISOString(),
-      stats,
-      items: items.sort((a: RiskItem, b: RiskItem) => {
-        const order = ['critical', 'high', 'medium', 'low', 'info'];
-        return order.indexOf(a.severity) - order.indexOf(b.severity);
-      }),
-      integrations
-    };
+    const report: RiskReport = buildRiskReport({
+      records,
+      integrations,
+      failures,
+    });
 
     if (argv.json) {
       console.log(JSON.stringify(report, null, 2));
@@ -79,65 +64,100 @@ async function main() {
       await fs.writeFile(argv.out as string, md);
       console.log(kleur.green(`\nReport saved to ${argv.out}`));
     }
-
-  } catch (err: any) {
-    console.error(kleur.red(`\nError: ${err.message}`));
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error(kleur.red(`\nError: ${message}`));
     process.exit(1);
   }
 }
 
 function printSummary(report: RiskReport) {
-  console.log(kleur.bold('\n--- Scan Summary ---'));
+  console.log(kleur.bold("\n--- Scan Summary ---"));
   console.log(`Projects: ${report.stats.totalProjects}`);
   console.log(`Env Vars: ${report.stats.totalVars}`);
-  console.log(`Exposed (non-sensitive): ${kleur.yellow(report.stats.varsReadableByAttacker)}`);
-  
-  console.log(`\nFindings:`);
-  console.log(`${kleur.red('Critical:')} ${report.stats.criticalCount}`);
-  console.log(`${kleur.magenta('High:')} ${report.stats.highCount}`);
-  console.log(`${kleur.yellow('Medium:')} ${report.stats.mediumCount}`);
+  console.log(
+    `Exposed (non-sensitive): ${kleur.yellow(report.stats.varsReadableByAttacker)}`,
+  );
+
+  console.log("\nFindings:");
+  console.log(`${kleur.red("Critical:")} ${report.stats.criticalCount}`);
+  console.log(`${kleur.magenta("High:")} ${report.stats.highCount}`);
+  console.log(`${kleur.yellow("Medium:")} ${report.stats.mediumCount}`);
+  if (report.isPartial) {
+    console.log(
+      kleur.red(
+        `\nPartial scan: ${report.failures.length} scope(s) failed and need review.`,
+      ),
+    );
+  }
 
   const topFindings = report.items
-    .filter((i: RiskItem) => ['critical', 'high', 'medium'].includes(i.severity))
+    .filter((i: RiskItem) =>
+      ["critical", "high", "medium"].includes(i.severity),
+    )
     .slice(0, 10);
 
   if (topFindings.length > 0) {
-    console.log(kleur.bold('\n--- Top Findings ---'));
+    console.log(kleur.bold("\n--- Top Findings ---"));
     for (const item of topFindings) {
-      const sevColor = item.severity === 'critical' ? kleur.red : item.severity === 'high' ? kleur.magenta : kleur.yellow;
-      console.log(`${sevColor(`[${item.severity.toUpperCase()}]`)} ${kleur.cyan(item.variable.projectName)} - ${kleur.white(item.variable.key)} (${item.matches[0]?.patternName || 'Unknown'})`);
+      const sevColor =
+        item.severity === "critical"
+          ? kleur.red
+          : item.severity === "high"
+            ? kleur.magenta
+            : kleur.yellow;
+      console.log(
+        `${sevColor(`[${item.severity.toUpperCase()}]`)} ${kleur.cyan(item.variable.projectName)} - ${kleur.white(item.variable.key)} (${item.matches[0]?.patternName || "Unknown"})`,
+      );
     }
   }
 
-  console.log(kleur.bold('\n--- Integrations ---'));
-  console.log(`GitHub: ${report.integrations.github ? kleur.green('Yes') : kleur.gray('No')}`);
-  console.log(`Linear: ${report.integrations.linear ? kleur.green('Yes') : kleur.gray('No')}`);
+  console.log(kleur.bold("\n--- Integrations ---"));
+  console.log(
+    `GitHub: ${report.integrations.github ? kleur.green("Yes") : kleur.gray("No")}`,
+  );
+  console.log(
+    `Linear: ${report.integrations.linear ? kleur.green("Yes") : kleur.gray("No")}`,
+  );
+  if (report.failures.length > 0) {
+    console.log(kleur.bold("\n--- Scan Gaps ---"));
+    for (const failure of report.failures.slice(0, 10)) {
+      console.log(
+        `${kleur.red(`[${failure.scope}]`)} ${failure.context}: ${failure.message}`,
+      );
+    }
+  }
 }
 
 function generateMarkdown(report: RiskReport): string {
-  let md = `# EnvScan Report — ${report.scannedAt.split('T')[0]}\n\n`;
-  md += `**Vercel breach rotation checklist** generated by EnvScan.\n\n`;
-  md += `## Summary\n`;
+  let md = `# EnvScan Report — ${report.scannedAt.split("T")[0]}\n\n`;
+  md += "**Vercel breach rotation checklist** generated by EnvScan.\n\n";
+  md += "## Summary\n";
   md += `- Projects scanned: ${report.stats.totalProjects}\n`;
   md += `- Environment variables: ${report.stats.totalVars}\n`;
   md += `- Readable by attacker (non-sensitive): ${report.stats.varsReadableByAttacker}\n`;
   md += `- Critical findings: ${report.stats.criticalCount}\n`;
   md += `- High findings: ${report.stats.highCount}\n`;
   md += `- Medium findings: ${report.stats.mediumCount}\n\n`;
+  if (report.isPartial) {
+    md += `> Warning: this report is partial. ${report.failures.length} scan scope(s) failed.\n\n`;
+  }
 
-  const highRisk = report.items.filter((i: RiskItem) => i.severity === 'critical' || i.severity === 'high');
+  const highRisk = report.items.filter(
+    (i: RiskItem) => i.severity === "critical" || i.severity === "high",
+  );
   if (highRisk.length > 0) {
-    md += `## High & Critical — rotate now\n\n`;
+    md += "## High & Critical — rotate now\n\n";
     for (const item of highRisk) {
       md += `### 🔴 [${item.variable.projectName}] ${item.variable.key}\n`;
-      md += `**Detected:** ${item.matches[0]?.patternName || 'Secret'}\n\n`;
+      md += `**Detected:** ${item.matches[0]?.patternName || "Secret"}\n\n`;
       md += `> ${item.rationale}\n\n`;
-      
+
       if (item.runbook) {
-        md += `#### 🛠 Rotation Checklist\n`;
-        item.runbook.steps.forEach((step, i) => {
+        md += "#### Rotation Checklist\n";
+        for (const step of item.runbook.steps) {
           md += `- [ ] ${step}\n`;
-        });
+        }
         if (item.runbook.consoleUrl) {
           md += `\n🔗 **Console:** [${item.runbook.title}](${item.runbook.consoleUrl})\n`;
         }
@@ -145,27 +165,36 @@ function generateMarkdown(report: RiskReport): string {
           md += `\n*Note: ${item.runbook.postRotationNote}*\n`;
         }
       }
-      md += `\n---\n\n`;
+      md += "\n---\n\n";
     }
   }
 
-  const medium = report.items.filter((i: RiskItem) => i.severity === 'medium');
+  const medium = report.items.filter((i: RiskItem) => i.severity === "medium");
   if (medium.length > 0) {
-    md += `## Medium Risk — review and roll\n\n`;
+    md += "## Medium Risk — review and roll\n\n";
     for (const item of medium) {
       md += `### 🟡 [${item.variable.projectName}] ${item.variable.key} (${item.matches[0]?.patternName})\n`;
       if (item.runbook) {
-        md += `\n**Next steps:**\n`;
-        item.runbook.steps.forEach(step => md += `- ${step}\n`);
+        md += "\n**Next steps:**\n";
+        for (const step of item.runbook.steps) {
+          md += `- ${step}\n`;
+        }
       }
-      md += `\n`;
+      md += "\n";
     }
   }
 
-  md += `## Integrations detected\n`;
-  md += `- GitHub ${report.integrations.github ? '✅' : '❌'}\n`;
-  md += `- Linear ${report.integrations.linear ? '✅' : '❌'}\n\n`;
-  
+  md += "## Integrations detected\n";
+  md += `- GitHub ${report.integrations.github ? "✅" : "❌"}\n`;
+  md += `- Linear ${report.integrations.linear ? "✅" : "❌"}\n\n`;
+  if (report.failures.length > 0) {
+    md += "## Scan gaps\n";
+    for (const failure of report.failures) {
+      md += `- [${failure.scope}] ${failure.context}: ${failure.message}\n`;
+    }
+    md += "\n";
+  }
+
   return md;
 }
 

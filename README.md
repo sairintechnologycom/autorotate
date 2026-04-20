@@ -3,13 +3,13 @@
 [![Vercel Security](https://img.shields.io/badge/Security-Vercel%20Breach%202026-orange)](https://vercel.com/security)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**EnvScan** is a priority security tool designed to identify and rotate exposed environment variables in Vercel projects following the April 2026 breach. It performs 100% client-side analysis to ensure your tokens remain on your machine.
+**EnvScan** is a priority security tool designed to identify and rotate environment variables that would have been readable in Vercel projects following the April 2026 breach. It performs 100% client-side analysis to ensure your tokens remain on your machine.
 
 ---
 
 ## 🛡️ Why EnvScan?
 
-The April 2026 Vercel incident compromised the encryption layer for environment variables. **Even secrets marked as "Sensitive" must be rotated.** 
+The April 2026 Vercel incident exposed environment variables that were readable through the Vercel API at the time of compromise. EnvScan treats non-sensitive variables as exposed by default and flags sensitive variables as encrypted-at-rest unless your incident response determines otherwise.
 
 EnvScan automates the discovery of these secrets across your entire Vercel account and provides context-aware rotation runbooks to help you secure your production infrastructure in minutes.
 

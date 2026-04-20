@@ -1,12 +1,12 @@
-import type { RunbookEntry } from './runbook.js';
+import type { RunbookEntry } from "./runbook.js";
 
 export interface VarRecord {
   id: string;
   key: string;
-  value: string | null;              // null if provider returned it as sensitive/unreadable
-  providerType: string;              // for Vercel: 'plain'|'encrypted'|'sensitive'|'system'|'secret'
-  readableByAttacker: boolean;       // true if type !== 'sensitive'
-  targets: string[];                 // ['production','preview',...]
+  value: string | null; // null if provider returned it as sensitive/unreadable
+  providerType: string; // for Vercel: 'plain'|'encrypted'|'sensitive'|'system'|'secret'
+  readableByAttacker: boolean; // true if type !== 'sensitive'
+  targets: string[]; // ['production','preview',...]
   projectId: string;
   projectName: string;
   teamId?: string;
@@ -16,15 +16,15 @@ export interface VarRecord {
   comment?: string;
 }
 
-export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
 export interface PatternMatch {
   patternId: string;
   patternName: string;
   severity: Severity;
   provider: string;
-  matchedOn: 'value' | 'key';
-  excerpt: string;                   // masked, e.g. "sk_live_…7Kp2"
+  matchedOn: "value" | "key";
+  excerpt: string; // masked, e.g. "sk_live_…7Kp2"
   runbookId: string;
 }
 
@@ -36,8 +36,15 @@ export interface RiskItem {
   runbook?: RunbookEntry;
 }
 
+export interface ScanFailure {
+  scope: "teams" | "projects" | "project-envs" | "integrations";
+  context: string;
+  message: string;
+}
+
 export interface RiskReport {
-  scannedAt: string;                 // ISO
+  scannedAt: string; // ISO
+  isPartial: boolean;
   stats: {
     totalProjects: number;
     totalVars: number;
@@ -46,10 +53,11 @@ export interface RiskReport {
     highCount: number;
     mediumCount: number;
   };
-  items: RiskItem[];                 // sorted by severity desc, then name
+  items: RiskItem[]; // sorted by severity desc, then name
   integrations: {
     github: boolean;
     linear: boolean;
     other: string[];
   };
+  failures: ScanFailure[];
 }
