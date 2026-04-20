@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --bg-dark: #09090b;
+  --bg-card: rgba(24, 24, 27, 0.8);
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.5);
+  
+  --severity-critical: #ef4444;
+  --severity-high: #f97316;
+  --severity-medium: #eab308;
+  --severity-low: #22c55e;
+  --severity-info: #3b82f6;
+}
+
+@layer base {
+  body {
+    @apply bg-[#09090b] text-zinc-100 antialiased selection:bg-blue-500/30;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 transition-all duration-300;
+  }
+  
+  .glass-hover {
+    @apply hover:bg-zinc-800/50 hover:border-zinc-700/50;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .severity-badge {
+    @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border;
+  }
+}
+
+/* Custom animations */
+@keyframes glow {
+  0% { box-shadow: 0 0 5px var(--accent-glow); }
+  50% { box-shadow: 0 0 20px var(--accent-glow); }
+  100% { box-shadow: 0 0 5px var(--accent-glow); }
+}
+
+.animate-glow {
+  animation: glow 3s infinite ease-in-out;
+}

@@ -1,0 +1,24 @@
+{
+  "name": "envscan",
+  "private": true,
+  "description": "Vercel Breach Rotation Utility",
+  "scripts": {
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "build": "pnpm -r build",
+    "envscan": "node packages/cli/dist/index.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "^25.6.0",
+    "@types/prompts": "^2.4.9",
+    "@types/yargs": "^17.0.35",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

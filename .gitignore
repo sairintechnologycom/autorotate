@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+.pnpm-debug.log*
+
+# Build outputs
+dist
+packages/*/dist
+*.tsbuildinfo
+.vite
+
+# Environment & Secrets
+.env*
+*.local
+!packages/web/.env.example
+
+# OS & IDE
+.DS_Store
+.vscode
+.idea
+*.log
+
+# Reports & Test Data
+report.md
+report.json
+VERIFY_REPORT.md
+test-output/

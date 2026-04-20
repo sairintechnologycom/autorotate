@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../scanner-core" },
+    { "path": "../adapter-vercel" }
+  ],
+  "include": ["src/**/*.ts"]
+}
