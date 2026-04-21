@@ -36,6 +36,18 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@25.6.0)(lightningcss@1.32.0)
 
+  packages/adapter-github:
+    dependencies:
+      '@envscan/scanner-core':
+        specifier: workspace:*
+        version: link:../scanner-core
+
+  packages/adapter-netlify:
+    dependencies:
+      '@envscan/scanner-core':
+        specifier: workspace:*
+        version: link:../scanner-core
+
   packages/adapter-vercel:
     dependencies:
       '@envscan/scanner-core':
@@ -79,6 +91,12 @@ importers:
 
   packages/web:
     dependencies:
+      '@envscan/adapter-github':
+        specifier: workspace:*
+        version: link:../adapter-github
+      '@envscan/adapter-netlify':
+        specifier: workspace:*
+        version: link:../adapter-netlify
       '@envscan/adapter-vercel':
         specifier: workspace:*
         version: link:../adapter-vercel

@@ -19,5 +19,10 @@
     "composite": true
   },
   "include": ["src"],
-  "references": [{ "path": "../scanner-core" }, { "path": "../adapter-vercel" }]
+  "references": [
+    { "path": "../scanner-core" }, 
+    { "path": "../adapter-vercel" },
+    { "path": "../adapter-github" },
+    { "path": "../adapter-netlify" }
+  ]
 }

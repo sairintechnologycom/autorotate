@@ -2,7 +2,7 @@ import { enumerateGitHub } from "@envscan/adapter-github";
 import { enumerateNetlify, scanSingleVar as scanNetlifyVar } from "@envscan/adapter-netlify";
 import { enumerateVercel, scanSingleVar as scanVercelVar } from "@envscan/adapter-vercel";
 import { buildRiskReport, classifyVar } from "@envscan/scanner-core";
-import type { RiskItem, RiskReport } from "@envscan/scanner-core";
+import type { RiskItem, RiskReport, ScanFailure, VarRecord } from "@envscan/scanner-core";
 import { type ClassValue, clsx } from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -119,9 +119,9 @@ export default function App() {
     setStatus("scanning");
     setError(null);
     try {
-      const allRecords = [];
-      const allIntegrations = { github: false, linear: false, other: [] as string[] };
-      const allFailures = [];
+      const allRecords: VarRecord[] = [];
+      const allIntegrations: RiskReport["integrations"] = { github: false, linear: false, other: [] };
+      const allFailures: ScanFailure[] = [];
 
       const scanPromises = [];
 

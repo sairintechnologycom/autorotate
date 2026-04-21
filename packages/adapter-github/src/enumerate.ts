@@ -47,7 +47,7 @@ export async function enumerateGitHub(opts: EnumerateOptions): Promise<{
     });
   } catch (err) {
     failures.push({
-      scope: "repos",
+      scope: "projects",
       context: "User repositories",
       message: err instanceof Error ? err.message : "Failed to list repositories",
     });
@@ -84,7 +84,7 @@ export async function enumerateGitHub(opts: EnumerateOptions): Promise<{
         // Some repos might not have actions enabled or permission denied
         // We log as failure but continue
         failures.push({
-            scope: "repo-secrets",
+            scope: "project-envs",
             context: repo.full_name,
             message: err instanceof Error ? err.message : "Failed to list secrets",
         });

@@ -1,12 +1,16 @@
 const BASE = "https://api.netlify.com/api/v1";
 
 export class NetlifyApiError extends Error {
+  status: number;
+  code: string;
   constructor(
-    public status: number,
-    public code: string,
+    status: number,
+    code: string,
     message: string,
   ) {
     super(message);
+    this.status = status;
+    this.code = code;
   }
 }
 

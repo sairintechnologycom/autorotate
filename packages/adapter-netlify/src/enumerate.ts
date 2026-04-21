@@ -7,11 +7,10 @@ interface NetlifyAccount {
   slug: string;
 }
 
-interface NetlifySite {
+interface NetlifyAccount {
   id: string;
   name: string;
-  account_slug: string;
-  account_id: string;
+  slug: string;
 }
 
 interface NetlifyEnvVar {
@@ -81,7 +80,7 @@ export async function enumerateNetlify(opts: EnumerateOptions): Promise<{
       accounts.push(...res);
     } catch (err) {
       failures.push({
-        scope: "accounts",
+        scope: "teams",
         context: "Accessible accounts",
         message: err instanceof Error ? err.message : "Failed to list accounts",
       });
@@ -91,29 +90,13 @@ export async function enumerateNetlify(opts: EnumerateOptions): Promise<{
   let currentAccountIdx = 0;
   for (const account of accounts) {
     const accountPctBase = (currentAccountIdx / accounts.length) * 100;
-    const accountPctWeight = 1 / accounts.length;
+
 
     client.setAccountId(account.slug);
     opts.onProgress?.(
       `Scanning account ${account.name}...`,
       Math.round(accountPctBase + 2),
     );
-
-    // 1) List sites for this account
-    let sites: NetlifySite[] = [];
-    try {
-        // Note: Netlify /sites endpoint lists all sites the user has access to.
-        // We filter by account locally or use the account-specific endpoint if it exists.
-        // The /accounts/{account_id}/sites endpoint is standard.
-        sites = await client.get<NetlifySite[]>(`/accounts/${account.slug}/sites`);
-    } catch (err) {
-      failures.push({
-        scope: "sites",
-        context: account.name,
-        message: err instanceof Error ? err.message : "Failed to list sites",
-      });
-      continue;
-    }
 
     // 2) List environment variables for the account
     // Netlify (new API) handles env vars at the account level, potentially scoped to sites.
@@ -122,7 +105,7 @@ export async function enumerateNetlify(opts: EnumerateOptions): Promise<{
       envVars = await client.get<NetlifyEnvVar[]>(`/accounts/${account.slug}/env`);
     } catch (err) {
         failures.push({
-            scope: "account-envs",
+            scope: "project-envs",
             context: account.name,
             message: err instanceof Error ? err.message : "Failed to retrieve account environment variables",
         });
