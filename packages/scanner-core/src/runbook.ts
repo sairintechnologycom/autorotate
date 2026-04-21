@@ -248,13 +248,50 @@ export const RUNBOOK: Record<string, RunbookEntry> = {
     consoleUrl: "https://gitlab.com/-/user_settings/personal_access_tokens",
     postRotationNote: "",
   },
+  netlify: {
+    id: "netlify",
+    title: "Rotate Netlify tokens",
+    steps: [
+      "Open Netlify Dashboard → User settings → Applications → Personal access tokens.",
+      "Revoke every token in the exposed list.",
+      "Generate replacement tokens. Save them to your password manager.",
+      "Update your project environment variables across all hosting platforms.",
+      "If using the Netlify CLI, re-authenticate with the new token.",
+    ],
+    consoleUrl: "https://app.netlify.com/user/settings/applications#personal-access-tokens",
+    postRotationNote: "Re-run your build pipelines to ensure settings are picked up.",
+  },
+  doppler: {
+    id: "doppler",
+    title: "Rotate Doppler Service Tokens",
+    steps: [
+      "Open Doppler Dashboard → [Project] → [Config] → Access.",
+      "Delete the exposed service token(s).",
+      "Generate new service tokens and update your infrastructure or CI/CD pipelines.",
+      "Review the Doppler Audit Log for any unauthorized access during the window.",
+    ],
+    consoleUrl: "https://dashboard.doppler.com",
+    postRotationNote: "Doppler allows zero-downtime rotation if you overlap the old and new tokens.",
+  },
+  infisical: {
+    id: "infisical",
+    title: "Rotate Infisical Service Tokens",
+    steps: [
+      "Open Infisical Dashboard → [Project] → Service Tokens.",
+      "Revoke the compromised service token.",
+      "Create a new service token and update your environment configuration.",
+      "Review Project Activity logs for anomalous behavior.",
+    ],
+    consoleUrl: "https://app.infisical.com",
+    postRotationNote: "Ensure you update any agents or CLI tools using this token.",
+  },
   "generic-key": {
     id: "generic-key",
     title: "Rotate private key",
     steps: [
       "Generate new key pair.",
       "Update the service that trusts this key (upload new public key / swap cert).",
-      "Update Vercel env var.",
+      "Update your project environment variables.",
       "Redeploy.",
     ],
     consoleUrl: "",
@@ -266,7 +303,7 @@ export const RUNBOOK: Record<string, RunbookEntry> = {
     steps: [
       "Identify which system this secret belongs to (the env var name is a hint).",
       "Follow that system's rotation docs.",
-      "Update Vercel env var; redeploy.",
+      "Update your project environment variables; redeploy.",
     ],
     consoleUrl: "",
     postRotationNote:

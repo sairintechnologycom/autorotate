@@ -1,4 +1,6 @@
-import { enumerateVercel, scanSingleVar } from "@envscan/adapter-vercel";
+import { enumerateGitHub } from "@envscan/adapter-github";
+import { enumerateNetlify, scanSingleVar as scanNetlifyVar } from "@envscan/adapter-netlify";
+import { enumerateVercel, scanSingleVar as scanVercelVar } from "@envscan/adapter-vercel";
 import { buildRiskReport, classifyVar } from "@envscan/scanner-core";
 import type { RiskItem, RiskReport } from "@envscan/scanner-core";
 import { type ClassValue, clsx } from "clsx";
@@ -29,6 +31,8 @@ function cn(...inputs: ClassValue[]) {
 export default function App() {
   const [token, setToken] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [netlifyToken, setNetlifyToken] = useState("");
+  const [githubToken, setGithubToken] = useState("");
   const [status, setStatus] = useState<"idle" | "scanning" | "done" | "error">(
     "idle",
   );
@@ -70,18 +74,37 @@ export default function App() {
   const verifyFix = async (item: RiskItem, idx: number) => {
     setVerifyingIdx(idx);
     try {
-      const fresh = await scanSingleVar({
-        token,
-        teamId: item.variable.teamId,
-        projectId: item.variable.projectId,
-        envId: item.variable.id,
-      });
-      const risk = classifyVar(fresh);
-      const isClean = risk.severity === "info";
-      setVerifiedItems((prev) => ({
-        ...prev,
-        [idx]: isClean ? "clean" : "still_risky",
-      }));
+      let fresh;
+      // Determine which adapter to use based on the record structure or token
+      // For now, we use simple detection. records from Netlify have projectId === accountId
+      if (item.variable.id.startsWith('nfp_') || netlifyToken) {
+        // This is a naive check; a better one would be a provider field in VarRecord
+        // Let's assume if we have a netlifyToken and the ID matches our Netlify format...
+        // Actually, let's just check if it's a Netlify record (projectID is accountID)
+        fresh = await scanNetlifyVar({
+          token: netlifyToken,
+          accountId: item.variable.projectId,
+          envId: item.variable.id,
+        });
+      } else if (token) {
+        fresh = await scanVercelVar({
+          token,
+          teamId: item.variable.teamId,
+          projectId: item.variable.projectId,
+          envId: item.variable.id,
+        });
+      } else {
+        throw new Error("No provider token available for verification");
+      }
+
+      if (fresh) {
+        const risk = classifyVar(fresh);
+        const isClean = risk.severity === "info";
+        setVerifiedItems((prev) => ({
+          ...prev,
+          [idx]: isClean ? "clean" : "still_risky",
+        }));
+      }
     } catch (err) {
       console.error("Verification failed", err);
     } finally {
@@ -91,18 +114,74 @@ export default function App() {
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token && !netlifyToken && !githubToken) return;
 
     setStatus("scanning");
     setError(null);
     try {
-      const { records, integrations, failures } = await enumerateVercel({
-        token,
-        teamId: teamId || undefined,
-        onProgress: (msg, pct) => setProgress({ msg, pct }),
-      });
+      const allRecords = [];
+      const allIntegrations = { github: false, linear: false, other: [] as string[] };
+      const allFailures = [];
 
-      setReport(buildRiskReport({ records, integrations, failures }));
+      const scanPromises = [];
+
+      if (token) {
+        scanPromises.push(
+          enumerateVercel({
+            token,
+            teamId: teamId || undefined,
+            onProgress: (msg, pct) => setProgress({ msg: `Vercel: ${msg}`, pct }),
+          }).then(res => {
+            allRecords.push(...res.records);
+            allIntegrations.github = allIntegrations.github || res.integrations.github;
+            allIntegrations.linear = allIntegrations.linear || res.integrations.linear;
+            allIntegrations.other.push(...res.integrations.other);
+            allFailures.push(...res.failures);
+          })
+        );
+      }
+
+      if (netlifyToken) {
+        scanPromises.push(
+          enumerateNetlify({
+            token: netlifyToken,
+            onProgress: (msg, pct) => setProgress({ msg: `Netlify: ${msg}`, pct }),
+          }).then(res => {
+            allRecords.push(...res.records);
+            allIntegrations.github = allIntegrations.github || res.integrations.github;
+            allIntegrations.linear = allIntegrations.linear || res.integrations.linear;
+            allIntegrations.other.push(...res.integrations.other);
+            allFailures.push(...res.failures);
+          })
+        );
+      }
+
+      if (githubToken) {
+        scanPromises.push(
+          enumerateGitHub({
+            token: githubToken,
+            onProgress: (msg, pct) => setProgress({ msg: `GitHub: ${msg}`, pct }),
+          }).then(res => {
+            allRecords.push(...res.records);
+            allIntegrations.github = allIntegrations.github || res.integrations.github;
+            allIntegrations.linear = allIntegrations.linear || res.integrations.linear;
+            allIntegrations.other.push(...res.integrations.other);
+            allFailures.push(...res.failures);
+          })
+        );
+      }
+
+      await Promise.all(scanPromises);
+
+      setReport(buildRiskReport({ 
+        records: allRecords, 
+        integrations: {
+            github: allIntegrations.github,
+            linear: allIntegrations.linear,
+            other: Array.from(new Set(allIntegrations.other))
+        }, 
+        failures: allFailures 
+    }));
       setStatus("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Scan failed");
@@ -209,6 +288,40 @@ export default function App() {
                     <p className="text-[10px] text-zinc-500">
                       Leave blank to scan all accessible teams.
                     </p>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-zinc-800">
+                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                      Additional Platforms
+                    </p>
+                    
+                    <div className="space-y-2">
+                      <label htmlFor="netlify-token" className="text-sm font-medium text-zinc-300">
+                        Netlify Access Token (Optional)
+                      </label>
+                      <input
+                        id="netlify-token"
+                        type="password"
+                        value={netlifyToken}
+                        onChange={(e) => setNetlifyToken(e.target.value)}
+                        placeholder="nfp_xxxxxxxxxxxx..."
+                        className="text-input w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label htmlFor="github-token" className="text-sm font-medium text-zinc-300">
+                        GitHub Personal Access Token (Optional)
+                      </label>
+                      <input
+                        id="github-token"
+                        type="password"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                        placeholder="ghp_xxxxxxxxxxxx..."
+                        className="text-input w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm"
+                      />
+                    </div>
                   </div>
 
                   <button

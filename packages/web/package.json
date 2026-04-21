@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@envscan/adapter-github": "workspace:*",
+    "@envscan/adapter-netlify": "workspace:*",
     "@envscan/adapter-vercel": "workspace:*",
     "@envscan/scanner-core": "workspace:*",
     "clsx": "^2.1.1",

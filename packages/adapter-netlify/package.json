@@ -1,0 +1,12 @@
+{
+  "name": "@envscan/adapter-netlify",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@envscan/scanner-core": "workspace:*"
+  }
+}
