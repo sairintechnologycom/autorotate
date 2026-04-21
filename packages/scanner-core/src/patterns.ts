@@ -127,7 +127,7 @@ export const PATTERNS: Pattern[] = [
     provider: "Netlify",
     severity: "critical",
     runbookId: "netlify",
-    valueRegex: /\bnfp_[0-9A-Za-z]{42,50}\b/,
+    valueRegex: /\bnfp_[0-9A-Za-z]{40,60}\b/,
   },
 
   // Payments
@@ -315,7 +315,7 @@ export const PATTERNS: Pattern[] = [
     provider: "Doppler",
     severity: "critical",
     runbookId: "doppler",
-    valueRegex: /\bdp\.(?:st|pt|cl)\.[A-Za-z0-9_-]{40,}\b/,
+    valueRegex: /\bdp\.(?:st|pt|cl)\.[A-Za-z0-9_.-]{30,}\b/,
   },
   {
     id: "infisical-token",
@@ -323,7 +323,7 @@ export const PATTERNS: Pattern[] = [
     provider: "Infisical",
     severity: "critical",
     runbookId: "infisical",
-    valueRegex: /\b(?:st|infisical)\.[A-Za-z0-9_-]{32,}\b/,
+    valueRegex: /\b(?:st|infisical)\.[A-Za-z0-9_.-]{20,}\b/,
   },
 
   // Generic fallbacks

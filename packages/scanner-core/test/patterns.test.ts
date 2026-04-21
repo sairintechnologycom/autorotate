@@ -100,4 +100,25 @@ describe("Pattern Matching", () => {
     expect(report.failures).toEqual(failures);
     expect(report.items[0].severity).toBe("critical");
   });
+
+  it("detects Netlify personal access token", () => {
+    const v = mockVar("NETLIFY_TOKEN", secret("nfp_", "a".repeat(40)));
+    const risk = classifyVar(v);
+    expect(risk.severity).toBe("critical");
+    expect(risk.matches[0].patternId).toBe("netlify-pat");
+  });
+
+  it("detects Doppler service token", () => {
+    const v = mockVar("DOPPLER_TOKEN", secret("dp.st.", "env", ".", "0".repeat(32)));
+    const risk = classifyVar(v);
+    expect(risk.severity).toBe("critical");
+    expect(risk.matches[0].patternId).toBe("doppler-token");
+  });
+
+  it("detects Infisical service token", () => {
+    const v = mockVar("INFISICAL_TOKEN", secret("st.", "0".repeat(32), ".", "0".repeat(8)));
+    const risk = classifyVar(v);
+    expect(risk.severity).toBe("critical");
+    expect(risk.matches[0].patternId).toBe("infisical-token");
+  });
 });
